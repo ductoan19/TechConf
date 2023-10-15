@@ -96,12 +96,17 @@ def notification():
 
 
 def send_email(email, subject, body):
-    if not app.config.get('SENDGRID_API_KEY'):
+    apiKey = app.config.get('SENDGRID_API_KEY')
+    if apiKey:
         message = Mail(
             from_email=app.config.get('ADMIN_EMAIL_ADDRESS'),
             to_emails=email,
             subject=subject,
             plain_text_content=body)
 
-        sg = SendGridAPIClient(app.config.get('SENDGRID_API_KEY'))
-        sg.send(message)
+        try:
+            sg = SendGridAPIClient(apiKey)
+            response = sg.send(message)
+            logging.info(response)
+        except Exception as e:
+            logging.error(e.message)
