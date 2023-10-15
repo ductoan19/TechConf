@@ -32,8 +32,9 @@ def registration():
             db.session.commit()
             session['message'] = 'Thank you, {} {}, for registering!'.format(attendee.first_name, attendee.last_name)
             return redirect('/Registration')
-        except:
+        except Exception as ex:
             logging.error('Error occured while saving your information')
+            logging.error(ex)
 
     else:
         if 'message' in session:
