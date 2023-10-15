@@ -1,16 +1,13 @@
 from app import app, db, queue_client
 from datetime import datetime
-from app.models import Attendee, Conference, Notification
-from flask import render_template, session, request, redirect, url_for, flash, make_response, session
+from app.models import Attendee, Notification
+from flask import render_template, session, request, redirect, session
 from azure.servicebus import ServiceBusMessage
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
 import logging
 
 @app.route('/')
 def index():
     return render_template('index.html')
-
 
 @app.route('/Registration', methods=['POST', 'GET'])
 def registration():
@@ -65,35 +62,12 @@ def notification():
         notification.subject = request.form['subject']
         notification.status = 'Notifications submitted'
         notification.submitted_date = datetime.utcnow()
-
         try:
             db.session.add(notification)
             db.session.commit()
-
             message = ServiceBusMessage(str(notification.id))
             queue_client.send_messages(message)
             logging.info(f'Sent notification {notification.id} to ServiceBus')
-
-            ##################################################
-            ## TODO: Refactor This logic into an Azure Function
-            ## Code below will be replaced by a message queue
-            #################################################
-            # attendees = Attendee.query.all()
-
-            # for attendee in attendees:
-            #     subject = '{}: {}'.format(attendee.first_name, notification.subject)
-            #     send_email(attendee.email, subject, notification.message)
-
-            # notification.completed_date = datetime.utcnow()
-            # notification.status = 'Notified {} attendees'.format(len(attendees))
-            # db.session.commit()
-
-            # TODO Call servicebus queue_client to enqueue notification ID
-
-            #################################################
-            ## END of TODO
-            #################################################
-
             return redirect('/Notifications')
         except Exception as ex:
             logging.error('log unable to save notification')
@@ -104,18 +78,4 @@ def notification():
 
 
 
-def send_email(email, subject, body):
-    apiKey = app.config.get('SENDGRID_API_KEY')
-    if apiKey:
-        message = Mail(
-            from_email=app.config.get('ADMIN_EMAIL_ADDRESS'),
-            to_emails=email,
-            subject=subject,
-            plain_text_content=body)
 
-        try:
-            sg = SendGridAPIClient(apiKey)
-            response = sg.send(message)
-            logging.info(response)
-        except Exception as e:
-            logging.error(e.message)
