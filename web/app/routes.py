@@ -2,7 +2,7 @@ from app import app, db, queue_client
 from datetime import datetime
 from app.models import Attendee, Conference, Notification
 from flask import render_template, session, request, redirect, url_for, flash, make_response, session
-from azure.servicebus import Message
+from azure.servicebus import ServiceBusMessage
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import logging
@@ -33,8 +33,10 @@ def registration():
             session['message'] = 'Thank you, {} {}, for registering!'.format(attendee.first_name, attendee.last_name)
             return redirect('/Registration')
         except Exception as ex:
+            session['message'] = str(ex)
             logging.error('Error occured while saving your information')
             logging.error(ex)
+            return render_template('registration.html')
 
     else:
         if 'message' in session:
@@ -68,19 +70,24 @@ def notification():
             db.session.add(notification)
             db.session.commit()
 
+            message = ServiceBusMessage(str(notification.id))
+            queue_client.send_messages(message)
+            logging.info(f'Sent notification {notification.id} to ServiceBus')
+
             ##################################################
             ## TODO: Refactor This logic into an Azure Function
             ## Code below will be replaced by a message queue
             #################################################
-            attendees = Attendee.query.all()
+            # attendees = Attendee.query.all()
 
-            for attendee in attendees:
-                subject = '{}: {}'.format(attendee.first_name, notification.subject)
-                send_email(attendee.email, subject, notification.message)
+            # for attendee in attendees:
+            #     subject = '{}: {}'.format(attendee.first_name, notification.subject)
+            #     send_email(attendee.email, subject, notification.message)
 
-            notification.completed_date = datetime.utcnow()
-            notification.status = 'Notified {} attendees'.format(len(attendees))
-            db.session.commit()
+            # notification.completed_date = datetime.utcnow()
+            # notification.status = 'Notified {} attendees'.format(len(attendees))
+            # db.session.commit()
+
             # TODO Call servicebus queue_client to enqueue notification ID
 
             #################################################
@@ -88,8 +95,9 @@ def notification():
             #################################################
 
             return redirect('/Notifications')
-        except :
+        except Exception as ex:
             logging.error('log unable to save notification')
+            logging.error(ex)
 
     else:
         return render_template('notification.html')
