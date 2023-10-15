@@ -24,6 +24,7 @@ def main(msg: ServiceBusMessage):
         for attendee in attendees:
                 _send_email(attendee[1], '{}: {}'.format(attendee[0], notification[0]), notification[1])
         cursor.execute(f'update public."notification" set "completed_date" = now(), "status" = \'Notified {len(attendees)} attendees\' where id = {notification_id}')
+        connection.commit()
     except (Exception, psycopg2.DatabaseError) as error:
         logging.error(error)
     finally:
